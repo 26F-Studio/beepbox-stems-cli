@@ -60,16 +60,18 @@ test("exports per-channel WAV stems and a manifest", async () => {
 	}
 });
 
-test("supports channel selection, loop count, and quiet mode", async () => {
+test("supports channel selection, loop spec, and quiet mode", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
 	try {
-		const { stdout } = await runCli(["--stems", "-q", "--channel", "1,3", "--loop-count", "2", `#${SONG_HASH}`, tempDir]);
+		const { stdout } = await runCli(["--stems", "-q", "--channel", "1,3", "--loop", "io2", `#${SONG_HASH}`, tempDir]);
 		assert.equal(stdout.trim(), "ch02.wav\nch04.wav");
 		const files = await readdir(tempDir);
 		assert.deepEqual(files.sort(), ["ch02.wav", "ch04.wav", "manifest.json"]);
 
 		const manifest = JSON.parse(await readFile(join(tempDir, "manifest.json"), "utf8"));
 		assert.equal(manifest.render.loopCount, 2);
+		assert.equal(manifest.render.enableIntro, true);
+		assert.equal(manifest.render.enableOutro, true);
 		assert.equal(manifest.render.durationSeconds, 8);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true });
@@ -102,6 +104,18 @@ test("refuses to overwrite a non-empty directory without --force", async () => {
 			(error) => /Output directory is not empty/.test(error.stderr),
 		);
 		await runCli(["--stems", "-q", "--force", `#${SONG_HASH}`, tempDir]);
+	} finally {
+		await rm(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("rejects an invalid --loop spec", async () => {
+	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
+	try {
+		await assert.rejects(
+			() => runCli(["--stems", "-q", "--loop", "intro", `#${SONG_HASH}`, join(tempDir, "out")]),
+			(error) => /--loop must look like/.test(error.stderr),
+		);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true });
 	}

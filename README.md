@@ -68,11 +68,7 @@ Add `--mix` to also render `mix.wav`.
 --mix                   Also export a full mix as mix.wav
 -f, --format <format>   Output format. Currently only "wav" is supported. Default: wav
 --sample-rate <hz>      Sample rate. Default: 48000
---loop-count <count>    Number of loop repetitions. Default: 1
---intro                 Include bars before the loop
---no-intro              Exclude bars before the loop
---outro                 Include bars after the loop
---no-outro              Exclude bars after the loop
+--loop <spec>           Loop controls: i=intro, o=outro, then repetitions. Default: io1
 --channel <list>        Comma-separated channel indexes to export, e.g. 0,2,3
 -o, --output <dir>      Output directory (alternative to the positional songName)
 --force                 Allow writing into an existing non-empty directory
@@ -81,8 +77,14 @@ Add `--mix` to also render `mix.wav`.
 -v, --version           Show the version
 ```
 
-When `--intro` / `--no-intro` and `--outro` / `--no-outro` are omitted, the CLI
-mirrors BeepBox's export defaults.
+`--loop` uses optional `i` (include intro) and `o` (include outro) flags followed
+by the loop repetition count. The default is `io1`. Examples:
+
+```bash
+--loop i2    # intro, two loops
+--loop o1    # outro, one loop
+--loop 1     # no intro or outro, one loop
+```
 
 Note: each stem is rendered independently through BeepBox's output limiter.
 Summing the stems may not exactly reconstruct `mix.wav` when the limiter is

@@ -18,8 +18,6 @@ async function main(): Promise<void> {
 
 	const loaded = await loadSongInput(options.input);
 	const song = loaded.song;
-	const enableIntro: boolean = options.intro ?? song.loopStart > 0;
-	const enableOutro: boolean = options.outro ?? song.loopStart + song.loopLength < song.barCount;
 	const outputName: string = options.outputName ?? loaded.suggestedName;
 	const outputDir: string = resolve(outputName);
 
@@ -29,8 +27,8 @@ async function main(): Promise<void> {
 		channels: options.channels,
 		sampleRate: options.sampleRate,
 		loopCount: options.loopCount,
-		enableIntro,
-		enableOutro,
+		enableIntro: options.intro,
+		enableOutro: options.outro,
 		force: options.force,
 		quiet: options.quiet,
 	});

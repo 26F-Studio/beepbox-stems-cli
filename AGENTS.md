@@ -180,14 +180,10 @@ Keep the order of `samplesPerSecond`, `loopRepeatCount`, and intro skipping the
 same as above. Renderer output was compared against upstream `SongRenderer` for
 a test song and was byte-identical for the tested case.
 
-Default intro/outro behavior, matching BeepBox's export dialog:
-
-```ts
-enableIntro = song.loopStart > 0;
-enableOutro = song.loopStart + song.loopLength < song.barCount;
-```
-
-`--intro`, `--no-intro`, `--outro`, and `--no-outro` override these defaults.
+The CLI exposes one `--loop <spec>` option. The spec consists of optional `i`
+(intro) and `o` (outro) flags followed by the loop repetition count, e.g. `io1`,
+`i2`, `o2`, or `1`. The default is `io1`; unlike BeepBox's export dialog, there
+is no automatic song-dependent intro/outro default at the CLI layer.
 
 ## Stems and the limiter
 

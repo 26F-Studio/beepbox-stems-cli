@@ -8,8 +8,8 @@ export interface CliOptions {
 	exportMix: boolean;
 	sampleRate: number;
 	loopCount: number;
-	intro?: boolean;
-	outro?: boolean;
+	intro: boolean;
+	outro: boolean;
 	channels?: number[];
 	force: boolean;
 	quiet: boolean;
@@ -36,11 +36,7 @@ Options:
   --mix                   Also export a full mix as mix.wav
   -f, --format <format>   Output format. Currently only "wav" is supported. Default: wav
   --sample-rate <hz>      Sample rate. Default: 48000
-  --loop-count <count>    Number of loop repetitions. Default: 1
-  --intro                 Include bars before the loop
-  --no-intro              Exclude bars before the loop
-  --outro                 Include bars after the loop
-  --no-outro              Exclude bars after the loop
+  --loop <spec>           Loop controls: i=intro, o=outro, then repetitions. Default: io1
   --channel <list>        Comma-separated channel indexes to export, e.g. 0,2,3
   -o, --output <dir>      Output directory (alternative to the positional songName)
   --force                 Allow writing into an existing non-empty directory
@@ -48,9 +44,8 @@ Options:
   -h, --help              Show this help
   -v, --version           Show the version
 
-If neither --intro/--no-intro nor --outro/--no-outro is given, the CLI mirrors
-BeepBox's export defaults: include intro when loopStart > 0, and include outro
-when the loop does not end at the last song bar.
+--loop examples: io1 (intro + outro, one loop), i2 (intro, two loops),
+o2 (outro, two loops), 1 (no intro or outro, one loop).
 
 URLs contain shell characters such as # and &. Always wrap them in quotes.
 `;
@@ -70,11 +65,7 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 				mix: { type: "boolean" },
 				format: { type: "string", short: "f" },
 				"sample-rate": { type: "string" },
-				"loop-count": { type: "string" },
-				intro: { type: "boolean" },
-				"no-intro": { type: "boolean" },
-				outro: { type: "boolean" },
-				"no-outro": { type: "boolean" },
+				loop: { type: "string" },
 				channel: { type: "string", multiple: true },
 				output: { type: "string", short: "o" },
 				force: { type: "boolean" },
@@ -111,16 +102,7 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 	}
 
 	const sampleRate: number = parseInteger(values["sample-rate"] ?? "48000", "--sample-rate", 8000, 192000);
-	const loopCount: number = parseInteger(values["loop-count"] ?? "1", "--loop-count", 1, 1000);
-
-	if (values.intro && values["no-intro"]) {
-		throw new Error("Use only one of --intro and --no-intro.");
-	}
-	if (values.outro && values["no-outro"]) {
-		throw new Error("Use only one of --outro and --no-outro.");
-	}
-	const intro: boolean | undefined = values.intro ? true : values["no-intro"] ? false : undefined;
-	const outro: boolean | undefined = values.outro ? true : values["no-outro"] ? false : undefined;
+	const loop = parseLoopSpec(values.loop ?? "io1");
 
 	let channels: number[] | undefined = undefined;
 	const channelValues: string[] | undefined = values.channel as string[] | undefined;
@@ -150,9 +132,9 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 			exportStems,
 			exportMix,
 			sampleRate,
-			loopCount,
-			intro,
-			outro,
+			loopCount: loop.loopCount,
+			intro: loop.intro,
+			outro: loop.outro,
 			channels,
 			force: values.force == true,
 			quiet: values.quiet == true,
@@ -169,4 +151,26 @@ function parseInteger(value: string, optionName: string, min: number, max: numbe
 		throw new Error(`${optionName} must be between ${min} and ${max}, got "${value}".`);
 	}
 	return numberValue;
+}
+
+interface LoopSpec {
+	intro: boolean;
+	outro: boolean;
+	loopCount: number;
+}
+
+function parseLoopSpec(value: string): LoopSpec {
+	const match: RegExpExecArray | null = /^([io]*)(\d+)$/i.exec(value.trim());
+	if (match == null) {
+		throw new Error('--loop must look like "io1": optional i (intro) and o (outro) flags followed by a loop count.');
+	}
+	const flags: string = match[1].toLowerCase();
+	if (new Set(flags).size != flags.length) {
+		throw new Error(`--loop contains duplicate flags: "${value}".`);
+	}
+	return {
+		intro: flags.includes("i"),
+		outro: flags.includes("o"),
+		loopCount: parseInteger(match[2], "--loop", 1, 1000),
+	};
 }

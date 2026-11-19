@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 
 export interface CliOptions {
 	input: string;
-	outputName?: string;
+	outputName: string;
 	format: "wav";
 	exportStems: boolean;
 	exportMix: boolean;
@@ -24,12 +24,12 @@ export interface ParsedCli {
 const HELP: string = `beepbox-stems - export BeepBox projects to WAV stems
 
 Usage:
-  beepbox-stems [options] <URL|song.json> [songName]
+  beepbox-stems [options] <songName> <URL|song.json>
 
 Examples:
-  beepbox-stems --stems -f wav "https://www.beepbox.co/#..." "My Song"
-  beepbox-stems --stems -f wav "./My Song.json" "My Song"
-  beepbox-stems --mix -f wav "https://www.beepbox.co/#..." "My Song"
+  beepbox-stems --stems -f wav "My Song" "https://www.beepbox.co/#..."
+  beepbox-stems --stems -f wav "My Song" "./My Song.json"
+  beepbox-stems --mix -f wav "My Song" "https://www.beepbox.co/#..."
 
 Options:
   --stems                 Export one WAV per channel (default when --mix is omitted)
@@ -38,7 +38,6 @@ Options:
   --sample-rate <hz>      Sample rate. Default: 48000
   --loop <spec>           Loop controls: i=intro, o=outro, then repetitions. Default: io1
   --channel <list>        Comma-separated channel indexes to export, e.g. 0,2,3
-  -o, --output <dir>      Output directory (alternative to the positional songName)
   --force                 Allow writing into an existing non-empty directory
   -q, --quiet             Suppress progress output
   -h, --help              Show this help
@@ -67,7 +66,6 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 				"sample-rate": { type: "string" },
 				loop: { type: "string" },
 				channel: { type: "string", multiple: true },
-				output: { type: "string", short: "o" },
 				force: { type: "boolean" },
 				quiet: { type: "boolean", short: "q" },
 				help: { type: "boolean", short: "h" },
@@ -82,19 +80,15 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 	if (values.help) return { showHelp: true, showVersion: false };
 	if (values.version) return { showHelp: false, showVersion: true };
 
-	if (parsed.positionals.length < 1) {
-		throw new Error("Missing input URL or JSON path. Use --help for usage.");
+	if (parsed.positionals.length < 2) {
+		throw new Error("Missing song name or input. Usage: beepbox-stems [options] <songName> <URL|song.json>.");
 	}
 	if (parsed.positionals.length > 2) {
-		throw new Error("Too many positional arguments. Use --help for usage.");
+		throw new Error("Too many positional arguments. Usage: beepbox-stems [options] <songName> <URL|song.json>.");
 	}
 
-	const input: string = parsed.positionals[0];
-	const positionalOutput: string | undefined = parsed.positionals[1];
-	const optionOutput: string | undefined = values.output;
-	if (positionalOutput != undefined && optionOutput != undefined) {
-		throw new Error("Provide the output name either as the second positional argument or with --output, not both.");
-	}
+	const outputName: string = parsed.positionals[0];
+	const input: string = parsed.positionals[1];
 
 	const format: string = (values.format ?? "wav").toLowerCase();
 	if (format != "wav") {
@@ -127,7 +121,7 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 		showVersion: false,
 		options: {
 			input,
-			outputName: positionalOutput ?? optionOutput,
+			outputName,
 			format: "wav",
 			exportStems,
 			exportMix,

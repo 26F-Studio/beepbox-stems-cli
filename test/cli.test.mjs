@@ -41,7 +41,7 @@ test("exports per-channel WAV stems and a manifest", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
 	const outputDir = join(tempDir, "My Song");
 	try {
-		await runCli(["--stems", "--mix", "-f", "wav", `https://www.beepbox.co/#${SONG_HASH}`, outputDir]);
+		await runCli(["--stems", "--mix", "-f", "wav", outputDir, `https://www.beepbox.co/#${SONG_HASH}`]);
 		const files = await readdir(outputDir);
 		assert.deepEqual(files.sort(), ["ch01.wav", "ch02.wav", "ch03.wav", "ch04.wav", "manifest.json", "mix.wav"]);
 
@@ -63,7 +63,7 @@ test("exports per-channel WAV stems and a manifest", async () => {
 test("supports channel selection, loop spec, and quiet mode", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
 	try {
-		const { stdout } = await runCli(["--stems", "-q", "--channel", "1,3", "--loop", "io2", `#${SONG_HASH}`, tempDir]);
+		const { stdout } = await runCli(["--stems", "-q", "--channel", "1,3", "--loop", "io2", tempDir, `#${SONG_HASH}`]);
 		assert.equal(stdout.trim(), "ch02.wav\nch04.wav");
 		const files = await readdir(tempDir);
 		assert.deepEqual(files.sort(), ["ch02.wav", "ch04.wav", "manifest.json"]);
@@ -83,7 +83,7 @@ test("rejects an out-of-range channel before creating the output directory", asy
 	const outputDir = join(tempDir, "Not Created");
 	try {
 		await assert.rejects(
-			() => runCli(["--stems", "-q", "--channel", "99", `#${SONG_HASH}`, outputDir]),
+			() => runCli(["--stems", "-q", "--channel", "99", outputDir, `#${SONG_HASH}`]),
 			(error) => /Channel index 99 is out of range/.test(error.stderr),
 		);
 		await assert.rejects(
@@ -98,12 +98,12 @@ test("rejects an out-of-range channel before creating the output directory", asy
 test("refuses to overwrite a non-empty directory without --force", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
 	try {
-		await runCli(["--stems", "-q", `#${SONG_HASH}`, tempDir]);
+		await runCli(["--stems", "-q", tempDir, `#${SONG_HASH}`]);
 		await assert.rejects(
-			() => runCli(["--stems", "-q", `#${SONG_HASH}`, tempDir]),
+			() => runCli(["--stems", "-q", tempDir, `#${SONG_HASH}`]),
 			(error) => /Output directory is not empty/.test(error.stderr),
 		);
-		await runCli(["--stems", "-q", "--force", `#${SONG_HASH}`, tempDir]);
+		await runCli(["--stems", "-q", "--force", tempDir, `#${SONG_HASH}`]);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true });
 	}
@@ -113,7 +113,7 @@ test("rejects an invalid --loop spec", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
 	try {
 		await assert.rejects(
-			() => runCli(["--stems", "-q", "--loop", "intro", `#${SONG_HASH}`, join(tempDir, "out")]),
+			() => runCli(["--stems", "-q", "--loop", "intro", join(tempDir, "out"), `#${SONG_HASH}`]),
 			(error) => /--loop must look like/.test(error.stderr),
 		);
 	} finally {
@@ -133,7 +133,7 @@ test("accepts a BeepBox JSON export", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
 	try {
 		const jsonPath = join(projectDir, "test", "fixtures", "test-song.json");
-		await runCli(["--stems", "-q", jsonPath, tempDir]);
+		await runCli(["--stems", "-q", tempDir, jsonPath]);
 		const files = await readdir(tempDir);
 		assert.deepEqual(files.sort(), ["ch01.wav", "ch02.wav", "ch03.wav", "ch04.wav", "manifest.json"]);
 	} finally {

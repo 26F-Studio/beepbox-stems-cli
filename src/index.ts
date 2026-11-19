@@ -18,8 +18,7 @@ async function main(): Promise<void> {
 
 	const loaded = await loadSongInput(options.input);
 	const song = loaded.song;
-	const outputName: string = options.outputName ?? loaded.suggestedName;
-	const outputDir: string = resolve(outputName);
+	const outputDir: string = resolve(options.outputName);
 
 	const result = await exportProject(song, outputDir, loaded.sourceLabel, {
 		exportStems: options.exportStems,

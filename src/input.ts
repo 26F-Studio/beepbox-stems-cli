@@ -1,11 +1,10 @@
 import { readFile, stat } from "node:fs/promises";
-import { basename, extname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { Song } from "../vendor/beepbox/synth/synth.js";
 
 export interface LoadedSong {
 	song: Song;
 	sourceLabel: string;
-	suggestedName: string;
 }
 
 export async function loadSongInput(input: string): Promise<LoadedSong> {
@@ -14,7 +13,6 @@ export async function loadSongInput(input: string): Promise<LoadedSong> {
 
 	let data: string | undefined = undefined;
 	let sourceLabel: string = describeSource(trimmedInput);
-	let suggestedName: string = "beepbox-song";
 
 	const filePath: string = resolve(trimmedInput);
 	try {
@@ -22,7 +20,6 @@ export async function loadSongInput(input: string): Promise<LoadedSong> {
 		if (fileStat.isFile()) {
 			data = await readFile(filePath, "utf8");
 			sourceLabel = filePath;
-			suggestedName = basename(filePath, extname(filePath)) || "beepbox-song";
 		} else if (fileStat.isDirectory()) {
 			throw new Error(`Input path is a directory, not a song file: ${filePath}`);
 		}
@@ -46,7 +43,7 @@ export async function loadSongInput(input: string): Promise<LoadedSong> {
 	}
 	validateSong(song);
 
-	return { song, sourceLabel, suggestedName };
+	return { song, sourceLabel };
 }
 
 function extractSongData(rawInput: string): string {

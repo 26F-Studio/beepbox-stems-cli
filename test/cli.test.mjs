@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -71,6 +71,23 @@ test("supports channel selection, loop count, and quiet mode", async () => {
 		const manifest = JSON.parse(await readFile(join(tempDir, "manifest.json"), "utf8"));
 		assert.equal(manifest.render.loopCount, 2);
 		assert.equal(manifest.render.durationSeconds, 8);
+	} finally {
+		await rm(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("rejects an out-of-range channel before creating the output directory", async () => {
+	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-stems-test-"));
+	const outputDir = join(tempDir, "Not Created");
+	try {
+		await assert.rejects(
+			() => runCli(["--stems", "-q", "--channel", "99", `#${SONG_HASH}`, outputDir]),
+			(error) => /Channel index 99 is out of range/.test(error.stderr),
+		);
+		await assert.rejects(
+			() => access(outputDir),
+			(error) => error.code == "ENOENT",
+		);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true });
 	}

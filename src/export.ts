@@ -21,8 +21,6 @@ export interface ExportResult {
 }
 
 export async function exportProject(song: Song, outputDir: string, sourceLabel: string, options: ExportOptions): Promise<ExportResult> {
-	await prepareOutputDirectory(outputDir, options.force);
-
 	const allChannels: number[] = [];
 	for (let channelIndex: number = 0; channelIndex < song.getChannelCount(); channelIndex++) {
 		allChannels.push(channelIndex);
@@ -35,6 +33,8 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 			);
 		}
 	}
+
+	await prepareOutputDirectory(outputDir, options.force);
 
 	const channelNumberWidth: number = Math.max(2, String(song.getChannelCount()).length);
 	const stemEntries: any[] = [];

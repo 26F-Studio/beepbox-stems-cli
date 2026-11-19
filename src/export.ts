@@ -1,11 +1,13 @@
 import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Song } from "../vendor/beepbox/synth/synth.js";
+import { getEffectiveQuality, getEncoderName, getFileExtension, OutputFormat, writeRenderedAudio } from "./audio-encoder.js";
 import { renderSong, RenderedAudio, RenderSettings } from "./render.js";
-import { encodeRenderedAudioAsWav } from "./wav.js";
 import { VERSION } from "./version.js";
 
 export interface ExportOptions extends RenderSettings {
+	format: OutputFormat;
+	quality?: number;
 	exportStems: boolean;
 	exportMix: boolean;
 	channels?: number[];
@@ -37,6 +39,7 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 	await prepareOutputDirectory(outputDir, options.force);
 
 	const channelNumberWidth: number = Math.max(2, String(song.getChannelCount()).length);
+	const extension: string = getFileExtension(options.format);
 	const stemEntries: any[] = [];
 	const stemFiles: string[] = [];
 	let durationSeconds: number = 0;
@@ -45,13 +48,13 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 	if (options.exportStems) {
 		for (let exportIndex: number = 0; exportIndex < channels.length; exportIndex++) {
 			const channelIndex: number = channels[exportIndex];
-			const fileName: string = `ch${String(channelIndex + 1).padStart(channelNumberWidth, "0")}.wav`;
+			const fileName: string = `ch${String(channelIndex + 1).padStart(channelNumberWidth, "0")}.${extension}`;
 			if (!options.quiet) {
 				console.log(`[${exportIndex + 1}/${channels.length}] Rendering channel ${channelIndex + 1} (${fileName})...`);
 			}
 
 			const audio: RenderedAudio = renderSong(song, options, channelIndex);
-			await writeFile(join(outputDir, fileName), encodeRenderedAudioAsWav(audio));
+			await writeRenderedAudio(audio, join(outputDir, fileName), options.format, options.quality);
 			durationSeconds = audio.durationSeconds;
 			stemFiles.push(fileName);
 			stemEntries.push({
@@ -70,8 +73,8 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 	if (options.exportMix) {
 		if (!options.quiet) console.log("Rendering full mix...");
 		const audio: RenderedAudio = renderSong(song, options, null);
-		mixFile = "mix.wav";
-		await writeFile(join(outputDir, mixFile), encodeRenderedAudioAsWav(audio));
+		mixFile = `mix.${extension}`;
+		await writeRenderedAudio(audio, join(outputDir, mixFile), options.format, options.quality);
 		durationSeconds = audio.durationSeconds;
 	}
 
@@ -83,8 +86,9 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 		generatedAt: new Date().toISOString(),
 		source: sourceLabel,
 		format: {
-			container: "wav",
-			encoding: "pcm_s16le",
+			container: options.format,
+			encoding: getEncoderName(options.format),
+			quality: getEffectiveQuality(options.format, options.quality),
 			sampleRate: options.sampleRate,
 			channelCount: 2,
 		},
@@ -123,7 +127,12 @@ async function prepareOutputDirectory(outputDir: string, force: boolean): Promis
 		}
 		if (force) {
 			for (const entry of entries) {
-				if (/^ch\d+\.wav$/.test(entry) || entry == "mix.wav" || entry == "manifest.json") {
+				if (
+					/^ch\d+\.(wav|mp3|ogg)$/.test(entry) ||
+					/^mix\.(wav|mp3|ogg)$/.test(entry) ||
+					entry == "manifest.json" ||
+					entry.endsWith(".part")
+				) {
 					await unlink(join(outputDir, entry));
 				}
 			}

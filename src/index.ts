@@ -24,6 +24,8 @@ async function main(): Promise<void> {
 		exportStems: options.exportStems,
 		exportMix: options.exportMix,
 		channels: options.channels,
+		format: options.format,
+		quality: options.quality,
 		sampleRate: options.sampleRate,
 		loopCount: options.loopCount,
 		enableIntro: options.intro,

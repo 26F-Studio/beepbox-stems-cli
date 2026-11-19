@@ -9,8 +9,9 @@ boundaries and the BeepBox internals that are otherwise easy to lose.
 
 - accepts a BeepBox project URL, raw song hash, or BeepBox JSON export;
 - renders the project with the vendored BeepBox synthesizer;
-- writes a full 16-bit PCM stereo WAV mix by default;
-- optionally writes one WAV per channel;
+- writes a full stereo mix by default;
+- optionally writes one file per channel;
+- supports WAV natively and MP3/OGG through an ffmpeg pipe;
 - writes a `manifest.json` describing the export.
 
 It is not a browser application and must not depend on BeepBox's editor, player,
@@ -56,7 +57,8 @@ src/render.ts  -> vendor/beepbox/synth/synth.js       (Song, Synth)
 src/export.ts  -> vendor/beepbox/synth/synth.js       (Song)
 ```
 
-`src/wav.ts` -> `src/wav-encoder.ts`. Everything else is CLI/IO logic.
+`src/wav.ts` -> `src/wav-encoder.ts`. `src/audio-encoder.ts` dispatches to the
+WAV encoder or to `src/ffmpeg.ts`. Everything else is CLI/IO logic.
 
 The `synth/` directory is self-contained. Its imports are limited to
 `SynthConfig.ts`, `FFT.ts`, `Deque.ts`, and `filtering.ts`. No editor playback
@@ -207,7 +209,7 @@ The current CLI exports per channel, not per instrument. This is intentional:
 - Splitting individual instruments requires deeper work in the synth/note
   scheduling path; it is not a small CLI-only change.
 
-## WAV output
+## Audio output
 
 `src/wav-encoder.ts` was extracted from BeepBox's original
 `editor/ExportPrompt.ts` WAV export path. It writes:
@@ -221,8 +223,15 @@ The current CLI exports per channel, not per instrument. This is intentional:
 Do not replace it with a third-party encoder without a concrete reason. Keeping
 the original conversion logic preserves output parity.
 
-The browser MP3 path used 44100 Hz and LAME, but MP3 is not implemented here.
-`--format` currently rejects anything except `wav`.
+`src/audio-encoder.ts` dispatches by format. WAV is written directly. MP3 and OGG
+use `src/ffmpeg.ts`, which pipes interleaved float32 PCM to an `ffmpeg` child
+process:
+
+- MP3: `libmp3lame`, default `-q:a 2`
+- OGG: `libvorbis`, default `-q:a 6`
+- output is written to `<name>.part`, then renamed after ffmpeg exits cleanly
+- ffmpeg is detected only when a lossy format is requested
+- MP3 sample rates are limited to libmp3lame's supported set
 
 ## Output contract
 
@@ -230,14 +239,16 @@ Output directory contents:
 
 ```text
 <name>/
-  ch01.wav
-  ch02.wav
+  mix.<ext>        # default, or mode all
+  ch01.<ext>       # mode stems or all
+  ch02.<ext>
   ...
-  mix.wav          # mode mix or all
   manifest.json
 ```
 
-`ch01.wav` maps to `channelIndex: 0`; filenames are 1-based. The manifest
+`<ext>` is `wav`, `mp3`, or `ogg`.
+
+`ch01.<ext>` maps to `channelIndex: 0`; filenames are 1-based. The manifest
 contains:
 
 - tool name/version
@@ -248,18 +259,18 @@ contains:
 - mix filename or null
 - a note about the limiter caveat
 
-`--force` deletes only recognized generated files (`chNN.wav`, `mix.wav`,
-`manifest.json`) before writing; it does not recursively delete the output
-directory. Keep this behavior unless deliberately changing the CLI contract.
+`--force` deletes only recognized generated files (`chNN.*`, `mix.*`,
+`manifest.json`, and `.part` files) before writing; it does not recursively
+delete the output directory. Keep this behavior unless deliberately changing
+the CLI contract.
 
 `--quiet` prints only the generated filenames, one per line, for scripts.
 
 ## Known limitations / future work
 
-- WAV only; MP3/FLAC would need an encoder and tests.
-- Whole-song Float32 buffers and the complete WAV buffer are held in memory.
-  Very long songs can consume large amounts of RAM. A streaming WAV writer is a
-  sensible future improvement.
+- MP3/OGG require an external ffmpeg executable; FLAC is not implemented.
+- Whole-song Float32 buffers are held in memory. Lossy encoders receive PCM
+  chunks through a pipe, but rendering itself is not streamed.
 - Empty/silent channels are currently exported as silent WAVs.
 - No per-instrument stems.
 - No automatic mixdown from stems; mode `mix`/`all` uses a separate full render.
@@ -275,8 +286,10 @@ as a child process. Tests cover:
 
 - URL input with per-channel stems plus mix;
 - WAV header and non-silent PCM checks;
-- channel selection, loop count, and quiet stdout;
+- channel selection, loop settings, and quiet stdout;
 - existing-output-directory protection and `--force`;
+- MP3/OGG encoding through ffmpeg when available;
+- quality and MP3 sample-rate validation;
 - help/version output;
 - JSON file input.
 

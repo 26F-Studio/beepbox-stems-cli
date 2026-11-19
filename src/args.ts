@@ -3,10 +3,11 @@ import { parseArgs } from "node:util";
 export interface CliOptions {
 	input: string;
 	outputName: string;
-	format: "wav";
+	format: "wav" | "mp3" | "ogg";
 	exportStems: boolean;
 	exportMix: boolean;
 	sampleRate: number;
+	quality?: number;
 	loopCount: number;
 	intro: boolean;
 	outro: boolean;
@@ -27,22 +28,27 @@ Usage:
   beepbox-export [options] <songName> <URL|song.json>
 
 Examples:
-  beepbox-export "My Song" "https://www.beepbox.co/#..."
-  beepbox-export -m stems -f wav "My Song" "./My Song.json"
+  beepbox-export -f wav "My Song" "https://www.beepbox.co/#..."
+  beepbox-export -f mp3 -q 2 "My Song" "https://www.beepbox.co/#..."
+  beepbox-export -f ogg -q 6 "My Song" "./My Song.json"
 
 Options:
   -m, --mode <mode>       Export mode: mix, stems, or all. Default: mix
-  -f, --format <format>   Output format. Currently only "wav" is supported. Default: wav
+  -f, --format <format>   Output format: wav, mp3, or ogg. Default: wav
+  -q, --quality <level>   Encoder quality: mp3 0-9 (lower=better), ogg 0-10 (higher=better)
   --sample-rate <hz>      Sample rate. Default: 48000
   --loop <spec>           Loop controls: i=intro, o=outro, then repetitions. Default: io1
   --channel <list>        Comma-separated channel indexes to export, e.g. 0,2,3
   --force                 Allow writing into an existing non-empty directory
-  -q, --quiet             Suppress progress output
+  --quiet                 Suppress progress output
   -h, --help              Show this help
   -v, --version           Show the version
 
 --loop examples: io1 (intro + outro, one loop), i2 (intro, two loops),
 o2 (outro, two loops), 1 (no intro or outro, one loop).
+
+MP3 and OGG output require the ffmpeg executable on PATH. Default qualities are
+mp3 2 and ogg 6.
 
 URLs contain shell characters such as # and &. Always wrap them in quotes.
 `;
@@ -60,11 +66,12 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 			options: {
 				mode: { type: "string", short: "m" },
 				format: { type: "string", short: "f" },
+				quality: { type: "string", short: "q" },
 				"sample-rate": { type: "string" },
 				loop: { type: "string" },
 				channel: { type: "string", multiple: true },
 				force: { type: "boolean" },
-				quiet: { type: "boolean", short: "q" },
+				quiet: { type: "boolean" },
 				help: { type: "boolean", short: "h" },
 				version: { type: "boolean", short: "v" },
 			},
@@ -88,11 +95,23 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 	const input: string = parsed.positionals[1];
 
 	const format: string = (values.format ?? "wav").toLowerCase();
-	if (format != "wav") {
-		throw new Error(`Unsupported format "${format}". Only "wav" is currently supported.`);
+	if (format != "wav" && format != "mp3" && format != "ogg") {
+		throw new Error(`Unsupported format "${format}". Use "wav", "mp3", or "ogg".`);
+	}
+
+	let quality: number | undefined = undefined;
+	if (values.quality != undefined) {
+		if (format == "wav") {
+			throw new Error("--quality is only supported with --format mp3 or ogg.");
+		}
+		const maxQuality: number = format == "mp3" ? 9 : 10;
+		quality = parseInteger(values.quality, "--quality", 0, maxQuality);
 	}
 
 	const sampleRate: number = parseInteger(values["sample-rate"] ?? "48000", "--sample-rate", 8000, 192000);
+	if (format == "mp3" && !MP3_SAMPLE_RATES.has(sampleRate)) {
+		throw new Error(`--sample-rate ${sampleRate} is not supported by MP3. Use one of: ${Array.from(MP3_SAMPLE_RATES).join(", ")}.`);
+	}
 	const loop = parseLoopSpec(values.loop ?? "io1");
 
 	let channels: number[] | undefined = undefined;
@@ -123,10 +142,11 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 		options: {
 			input,
 			outputName,
-			format: "wav",
+			format,
 			exportStems,
 			exportMix,
 			sampleRate,
+			quality,
 			loopCount: loop.loopCount,
 			intro: loop.intro,
 			outro: loop.outro,
@@ -169,3 +189,5 @@ function parseLoopSpec(value: string): LoopSpec {
 		loopCount: parseInteger(match[2], "--loop", 1, 1000),
 	};
 }
+
+const MP3_SAMPLE_RATES: ReadonlySet<number> = new Set<number>([8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000]);

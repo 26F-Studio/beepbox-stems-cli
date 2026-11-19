@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import { access, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -10,6 +10,7 @@ import test from "node:test";
 const execFileAsync = promisify(execFile);
 const projectDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const cliPath = join(projectDir, "dist", "beepbox-export.mjs");
+const ffmpegAvailable = spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status == 0;
 
 // A minimal current-format BeepBox song with one note on each channel.
 const SONG_HASH =
@@ -63,7 +64,7 @@ test("exports per-channel WAV stems and a manifest", async () => {
 test("supports channel selection, loop spec, and quiet mode", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
 	try {
-		const { stdout } = await runCli(["-m", "stems", "-q", "--channel", "1,3", "--loop", "io2", tempDir, `#${SONG_HASH}`]);
+		const { stdout } = await runCli(["-m", "stems", "--quiet", "--channel", "1,3", "--loop", "io2", tempDir, `#${SONG_HASH}`]);
 		assert.equal(stdout.trim(), "ch02.wav\nch04.wav");
 		const files = await readdir(tempDir);
 		assert.deepEqual(files.sort(), ["ch02.wav", "ch04.wav", "manifest.json"]);
@@ -83,7 +84,7 @@ test("rejects an out-of-range channel before creating the output directory", asy
 	const outputDir = join(tempDir, "Not Created");
 	try {
 		await assert.rejects(
-			() => runCli(["-m", "stems", "-q", "--channel", "99", outputDir, `#${SONG_HASH}`]),
+			() => runCli(["-m", "stems", "--quiet", "--channel", "99", outputDir, `#${SONG_HASH}`]),
 			(error) => /Channel index 99 is out of range/.test(error.stderr),
 		);
 		await assert.rejects(
@@ -98,12 +99,12 @@ test("rejects an out-of-range channel before creating the output directory", asy
 test("refuses to overwrite a non-empty directory without --force", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
 	try {
-		await runCli(["-m", "stems", "-q", tempDir, `#${SONG_HASH}`]);
+		await runCli(["-m", "stems", "--quiet", tempDir, `#${SONG_HASH}`]);
 		await assert.rejects(
-			() => runCli(["-m", "stems", "-q", tempDir, `#${SONG_HASH}`]),
+			() => runCli(["-m", "stems", "--quiet", tempDir, `#${SONG_HASH}`]),
 			(error) => /Output directory is not empty/.test(error.stderr),
 		);
-		await runCli(["-m", "stems", "-q", "--force", tempDir, `#${SONG_HASH}`]);
+		await runCli(["-m", "stems", "--quiet", "--force", tempDir, `#${SONG_HASH}`]);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true });
 	}
@@ -113,7 +114,7 @@ test("rejects an invalid --loop spec", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
 	try {
 		await assert.rejects(
-			() => runCli(["-m", "stems", "-q", "--loop", "intro", join(tempDir, "out"), `#${SONG_HASH}`]),
+			() => runCli(["-m", "stems", "--quiet", "--loop", "intro", join(tempDir, "out"), `#${SONG_HASH}`]),
 			(error) => /--loop must look like/.test(error.stderr),
 		);
 	} finally {
@@ -125,7 +126,7 @@ test("exports only the mix by default", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
 	const outputDir = join(tempDir, "Mix Only");
 	try {
-		await runCli(["-q", outputDir, `#${SONG_HASH}`]);
+		await runCli(["--quiet", outputDir, `#${SONG_HASH}`]);
 		const files = await readdir(outputDir);
 		assert.deepEqual(files.sort(), ["manifest.json", "mix.wav"]);
 		const manifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8"));
@@ -140,8 +141,68 @@ test("rejects an invalid --mode", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
 	try {
 		await assert.rejects(
-			() => runCli(["-m", "everything", "-q", join(tempDir, "out"), `#${SONG_HASH}`]),
+			() => runCli(["-m", "everything", "--quiet", join(tempDir, "out"), `#${SONG_HASH}`]),
 			(error) => /Unsupported mode/.test(error.stderr),
+		);
+	} finally {
+		await rm(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("exports MP3 with the requested quality", { skip: !ffmpegAvailable }, async () => {
+	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
+	const outputDir = join(tempDir, "MP3");
+	try {
+		await runCli(["-m", "mix", "-f", "mp3", "-q", "2", "--quiet", outputDir, `#${SONG_HASH}`]);
+		const files = await readdir(outputDir);
+		assert.deepEqual(files.sort(), ["manifest.json", "mix.mp3"]);
+		const mp3 = await readFile(join(outputDir, "mix.mp3"));
+		assert.equal(mp3.toString("ascii", 0, 3), "ID3");
+		const manifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8"));
+		assert.equal(manifest.format.container, "mp3");
+		assert.equal(manifest.format.encoding, "libmp3lame");
+		assert.equal(manifest.format.quality, 2);
+	} finally {
+		await rm(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("exports OGG with the default quality", { skip: !ffmpegAvailable }, async () => {
+	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
+	const outputDir = join(tempDir, "OGG");
+	try {
+		await runCli(["-m", "mix", "-f", "ogg", "--quiet", outputDir, `#${SONG_HASH}`]);
+		const files = await readdir(outputDir);
+		assert.deepEqual(files.sort(), ["manifest.json", "mix.ogg"]);
+		const ogg = await readFile(join(outputDir, "mix.ogg"));
+		assert.equal(ogg.toString("ascii", 0, 4), "OggS");
+		const manifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8"));
+		assert.equal(manifest.format.container, "ogg");
+		assert.equal(manifest.format.encoding, "libvorbis");
+		assert.equal(manifest.format.quality, 6);
+	} finally {
+		await rm(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("rejects invalid quality settings", async () => {
+	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
+	try {
+		await assert.rejects(
+			() => runCli(["-f", "wav", "-q", "1", join(tempDir, "wav"), `#${SONG_HASH}`]),
+			(error) => /--quality is only supported/.test(error.stderr),
+		);
+		await assert.rejects(
+			() => runCli(["-f", "mp3", "-q", "10", join(tempDir, "mp3"), `#${SONG_HASH}`]),
+			(error) => /--quality must be between 0 and 9/.test(error.stderr),
+		);
+		await assert.rejects(
+			() => runCli(["-f", "ogg", "-q", "11", join(tempDir, "ogg"), `#${SONG_HASH}`]),
+			(error) => /--quality must be between 0 and 10/.test(error.stderr),
+		);
+		await assert.rejects(
+			() => runCli(["-f", "mp3", "--sample-rate", "96000", join(tempDir, "rate"), `#${SONG_HASH}`]),
+			(error) => /not supported by MP3/.test(error.stderr),
 		);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true });
@@ -152,6 +213,8 @@ test("prints help and version", async () => {
 	const help = await runCli(["--help"]);
 	assert.match(help.stdout, /Usage:/);
 	assert.match(help.stdout, /--mode/);
+	assert.match(help.stdout, /--quality/);
+	assert.match(help.stdout, /--format/);
 	const version = await runCli(["--version"]);
 	assert.match(version.stdout, /^beepbox-export \d+\.\d+\.\d+/);
 });
@@ -160,7 +223,7 @@ test("accepts a BeepBox JSON export", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
 	try {
 		const jsonPath = join(projectDir, "test", "fixtures", "test-song.json");
-		await runCli(["-m", "stems", "-q", tempDir, jsonPath]);
+		await runCli(["-m", "stems", "--quiet", tempDir, jsonPath]);
 		const files = await readdir(tempDir);
 		assert.deepEqual(files.sort(), ["ch01.wav", "ch02.wav", "ch03.wav", "ch04.wav", "manifest.json"]);
 	} finally {

@@ -1,0 +1,27 @@
+{
+	"name": "beepbox-stems",
+	"version": "0.1.0",
+	"description": "Render BeepBox projects to per-channel WAV stems from the command line.",
+	"type": "module",
+	"private": true,
+	"bin": {
+		"beepbox-stems": "dist/beepbox-stems.mjs"
+	},
+	"scripts": {
+		"build": "node scripts/build.mjs",
+		"typecheck": "tsc -p tsconfig.json",
+		"format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.mjs\" \"test/**/*.mjs\"",
+		"test": "npm run build && node --test test/*.test.mjs",
+		"start": "node dist/beepbox-stems.mjs"
+	},
+	"engines": {
+		"node": ">=20"
+	},
+	"devDependencies": {
+		"@types/node": "^26.6.6",
+		"esbuild": "^0.25.0",
+		"prettier": "^3.10.1",
+		"typescript": "^7.0.2"
+	},
+	"license": "MIT"
+}

@@ -1,0 +1,33 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local logs and environment files
+*.log
+npm-debug.log*
+.env
+.env.*
+!.env.example
+
+# OS/editor metadata
+.DS_Store
+Thumbs.db
+
+# Local generated audio and archives
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.zip
+*.tgz
+/exports/
+/out/
+
+# Keep intentional audio fixtures if they are added later
+!test/fixtures/**/*.wav
+
+# Ignore local render output directories created by ad-hoc testing
+/test-output/
+/tmp/

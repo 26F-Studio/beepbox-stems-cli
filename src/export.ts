@@ -77,7 +77,7 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 
 	const manifest: any = {
 		tool: {
-			name: "beepbox-stems",
+			name: "beepbox-export",
 			version: VERSION,
 		},
 		generatedAt: new Date().toISOString(),

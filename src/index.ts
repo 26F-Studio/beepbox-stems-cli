@@ -11,7 +11,7 @@ async function main(): Promise<void> {
 		return;
 	}
 	if (parsed.showVersion) {
-		console.log(`beepbox-stems ${VERSION}`);
+		console.log(`beepbox-export ${VERSION}`);
 		return;
 	}
 	const options = parsed.options!;

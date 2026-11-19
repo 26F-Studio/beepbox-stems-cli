@@ -1,9 +1,9 @@
-# Beepbox-Stems
+# Beepbox-Export
 
 > Designed by MrZ, Made by Deepseek-flash
 
-A standalone command-line renderer that exports BeepBox projects to per-channel
-WAV stems and an optional full mix.
+A standalone command-line renderer that exports BeepBox projects to a full WAV
+mix or per-channel stems.
 
 It vendors only BeepBox's `synth/` source under `vendor/beepbox/`, so it does not
 include the BeepBox editor, player, website, or build system.
@@ -20,9 +20,9 @@ npm install
 npm run build
 ```
 
-The executable is written to `dist/beepbox-stems.mjs`.
+The executable is written to `dist/beepbox-export.mjs`.
 
-To expose it as the `beepbox-stems` command:
+To expose it as the `beepbox-export` command:
 
 ```bash
 npm link
@@ -31,39 +31,43 @@ npm link
 ## Usage
 
 ```text
-beepbox-stems [options] <songName> <URL|song.json>
+beepbox-export [options] <songName> <URL|song.json>
 ```
 
 ```bash
-beepbox-stems --stems -f wav "My Song" "https://www.beepbox.co/#..."
-beepbox-stems --stems -f wav "My Song" "./My Song.json"
+beepbox-export -f wav "My Song" "https://www.beepbox.co/#..."
+beepbox-export -m all -f wav "My Song" "https://www.beepbox.co/#..."
+beepbox-export -m stems -f wav "My Song" "./My Song.json"
 ```
 
 or without `npm link`:
 
 ```bash
-node dist/beepbox-stems.mjs --stems -f wav "My Song" "https://www.beepbox.co/#..."
+node dist/beepbox-export.mjs -f wav "My Song" "https://www.beepbox.co/#..."
 ```
 
 URLs contain shell characters such as `#` and `&`, so always quote them.
 
 ## Output
 
+By default, only the full mix is exported:
+
 ```text
 My Song/
-  ch01.wav
-  ch02.wav
-  ...
+  mix.wav
   manifest.json
 ```
 
-Add `--mix` to also render `mix.wav`.
+Use `-m/--mode` to choose the export mode:
+
+- `mix`: only `mix.wav` (default)
+- `stems`: one WAV per channel
+- `all`: per-channel stems plus `mix.wav`
 
 ## Options
 
 ```text
---stems                 Export one WAV per channel (default when --mix is omitted)
---mix                   Also export a full mix as mix.wav
+-m, --mode <mode>       Export mode: mix, stems, or all. Default: mix
 -f, --format <format>   Output format. Currently only "wav" is supported. Default: wav
 --sample-rate <hz>      Sample rate. Default: 48000
 --loop <spec>           Loop controls: i=intro, o=outro, then repetitions. Default: io1

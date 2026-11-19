@@ -1,16 +1,16 @@
 # AGENTS.md
 
-This file is for agents working on `beepbox-stems`. It captures the project
+This file is for agents working on `beepbox-export`. It captures the project
 boundaries and the BeepBox internals that are otherwise easy to lose.
 
 ## Project purpose
 
-`beepbox-stems` is a standalone Node.js CLI that:
+`beepbox-export` is a standalone Node.js CLI that:
 
 - accepts a BeepBox project URL, raw song hash, or BeepBox JSON export;
 - renders the project with the vendored BeepBox synthesizer;
-- writes one 16-bit PCM stereo WAV per channel;
-- optionally writes a full mix;
+- writes a full 16-bit PCM stereo WAV mix by default;
+- optionally writes one WAV per channel;
 - writes a `manifest.json` describing the export.
 
 It is not a browser application and must not depend on BeepBox's editor, player,
@@ -36,11 +36,11 @@ or website code.
 
 ```bash
 npm install
-npm run build       # esbuild bundle -> dist/beepbox-stems.mjs
+npm run build       # esbuild bundle -> dist/beepbox-export.mjs
 npm run typecheck   # tsc --noEmit
 npm test            # builds, then runs Node's built-in test runner
 npm start -- --help
-npm link            # optional: expose the beepbox-stems command
+npm link            # optional: expose the beepbox-export command
 ```
 
 The build is ESM, targets Node 20+, bundles all source into one executable file,
@@ -233,7 +233,7 @@ Output directory contents:
   ch01.wav
   ch02.wav
   ...
-  mix.wav          # only with --mix
+  mix.wav          # mode mix or all
   manifest.json
 ```
 
@@ -262,7 +262,7 @@ directory. Keep this behavior unless deliberately changing the CLI contract.
   sensible future improvement.
 - Empty/silent channels are currently exported as silent WAVs.
 - No per-instrument stems.
-- No automatic mixdown from stems; `--mix` uses a separate full render.
+- No automatic mixdown from stems; mode `mix`/`all` uses a separate full render.
 - No normalization, resampling, dithering, metadata tags, or ZIP packaging.
 - JSON loop unrolling needs care; URL input is preferred.
 - Upstream synthesizer changes can change output, so always pin and test the

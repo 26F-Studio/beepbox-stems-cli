@@ -21,19 +21,17 @@ export interface ParsedCli {
 	showVersion: boolean;
 }
 
-const HELP: string = `beepbox-stems - export BeepBox projects to WAV stems
+const HELP: string = `beepbox-export - export BeepBox projects to WAV
 
 Usage:
-  beepbox-stems [options] <songName> <URL|song.json>
+  beepbox-export [options] <songName> <URL|song.json>
 
 Examples:
-  beepbox-stems --stems -f wav "My Song" "https://www.beepbox.co/#..."
-  beepbox-stems --stems -f wav "My Song" "./My Song.json"
-  beepbox-stems --mix -f wav "My Song" "https://www.beepbox.co/#..."
+  beepbox-export "My Song" "https://www.beepbox.co/#..."
+  beepbox-export -m stems -f wav "My Song" "./My Song.json"
 
 Options:
-  --stems                 Export one WAV per channel (default when --mix is omitted)
-  --mix                   Also export a full mix as mix.wav
+  -m, --mode <mode>       Export mode: mix, stems, or all. Default: mix
   -f, --format <format>   Output format. Currently only "wav" is supported. Default: wav
   --sample-rate <hz>      Sample rate. Default: 48000
   --loop <spec>           Loop controls: i=intro, o=outro, then repetitions. Default: io1
@@ -60,8 +58,7 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 			args: argv,
 			allowPositionals: true,
 			options: {
-				stems: { type: "boolean" },
-				mix: { type: "boolean" },
+				mode: { type: "string", short: "m" },
 				format: { type: "string", short: "f" },
 				"sample-rate": { type: "string" },
 				loop: { type: "string" },
@@ -81,10 +78,10 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 	if (values.version) return { showHelp: false, showVersion: true };
 
 	if (parsed.positionals.length < 2) {
-		throw new Error("Missing song name or input. Usage: beepbox-stems [options] <songName> <URL|song.json>.");
+		throw new Error("Missing song name or input. Usage: beepbox-export [options] <songName> <URL|song.json>.");
 	}
 	if (parsed.positionals.length > 2) {
-		throw new Error("Too many positional arguments. Usage: beepbox-stems [options] <songName> <URL|song.json>.");
+		throw new Error("Too many positional arguments. Usage: beepbox-export [options] <songName> <URL|song.json>.");
 	}
 
 	const outputName: string = parsed.positionals[0];
@@ -113,8 +110,12 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 		if (channels.length == 0) throw new Error("--channel did not contain any channel indexes.");
 	}
 
-	const exportStems: boolean = values.stems == true || values.mix != true;
-	const exportMix: boolean = values.mix == true;
+	const mode: string = (values.mode ?? "mix").toLowerCase();
+	if (mode != "stems" && mode != "mix" && mode != "all") {
+		throw new Error(`Unsupported mode "${mode}". Use "stems", "mix", or "all".`);
+	}
+	const exportStems: boolean = mode == "stems" || mode == "all";
+	const exportMix: boolean = mode == "mix" || mode == "all";
 
 	return {
 		showHelp: false,

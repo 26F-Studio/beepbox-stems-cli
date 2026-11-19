@@ -1,18 +1,18 @@
 {
-	"name": "beepbox-stems",
+	"name": "beepbox-export",
 	"version": "0.1.0",
-	"description": "Render BeepBox projects to per-channel WAV stems from the command line.",
+	"description": "Export BeepBox projects to WAV from the command line.",
 	"type": "module",
 	"private": true,
 	"bin": {
-		"beepbox-stems": "dist/beepbox-stems.mjs"
+		"beepbox-export": "dist/beepbox-export.mjs"
 	},
 	"scripts": {
 		"build": "node scripts/build.mjs",
 		"typecheck": "tsc -p tsconfig.json",
 		"format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.mjs\" \"test/**/*.mjs\"",
 		"test": "npm run build && node --test test/*.test.mjs",
-		"start": "node dist/beepbox-stems.mjs"
+		"start": "node dist/beepbox-export.mjs"
 	},
 	"engines": {
 		"node": ">=20"

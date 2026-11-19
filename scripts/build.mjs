@@ -3,7 +3,7 @@ import { build } from "esbuild";
 
 await build({
 	entryPoints: ["src/index.ts"],
-	outfile: "dist/beepbox-stems.mjs",
+	outfile: "dist/beepbox-export.mjs",
 	bundle: true,
 	platform: "node",
 	format: "esm",
@@ -13,4 +13,4 @@ await build({
 	logLevel: "info",
 });
 
-await chmod("dist/beepbox-stems.mjs", 0o755);
+await chmod("dist/beepbox-export.mjs", 0o755);

@@ -84,11 +84,8 @@ export function parseCliArgs(argv: string[]): ParsedCli {
 	if (values.help) return { showHelp: true, showVersion: false };
 	if (values.version) return { showHelp: false, showVersion: true };
 
-	if (parsed.positionals.length < 2) {
-		throw new Error("Missing song name or input. Usage: beepbox-export [options] <songName> <URL|song.json>.");
-	}
-	if (parsed.positionals.length > 2) {
-		throw new Error("Too many positional arguments. Usage: beepbox-export [options] <songName> <URL|song.json>.");
+	if (parsed.positionals.length != 2) {
+		throw new Error("Need 2 params.\nUsage: beepbox-export [options] <songName> <URL|song.json>.");
 	}
 
 	const outputName: string = parsed.positionals[0];

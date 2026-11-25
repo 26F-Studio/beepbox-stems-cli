@@ -235,18 +235,27 @@ process:
 
 ## Output contract
 
-Output directory contents:
+Mix-only mode (`-m mix`, the default) writes flat files and creates no
+directory:
+
+```text
+<name>.<ext>       # full mix
+<name>.json        # metadata manifest
+```
+
+Any mode that includes stems uses a directory:
 
 ```text
 <name>/
-  mix.<ext>        # default, or mode all
+  mix.<ext>        # mode all
   ch01.<ext>       # mode stems or all
   ch02.<ext>
   ...
   manifest.json
 ```
 
-`<ext>` is `wav`, `mp3`, or `ogg`.
+`<ext>` is `wav`, `mp3`, or `ogg`. In flat mode the manifest's `mix` field and
+the `--quiet` output use `<name>.<ext>`.
 
 `ch01.<ext>` maps to `channelIndex: 0`; filenames are 1-based. The manifest
 contains:
@@ -259,10 +268,11 @@ contains:
 - mix filename or null
 - a note about the limiter caveat
 
-`--force` deletes only recognized generated files (`chNN.*`, `mix.*`,
-`manifest.json`, and `.part` files) before writing; it does not recursively
-delete the output directory. Keep this behavior unless deliberately changing
-the CLI contract.
+In directory mode, `--force` deletes only recognized generated files (`chNN.*`,
+`mix.*`, `manifest.json`, and `.part` files) before writing; it does not
+recursively delete the output directory. In flat mix mode, existing
+`<name>.<ext>`/`<name>.json` files are rejected unless `--force` is given. Keep
+this behavior unless deliberately changing the CLI contract.
 
 `--quiet` prints only the generated filenames, one per line, for scripts.
 

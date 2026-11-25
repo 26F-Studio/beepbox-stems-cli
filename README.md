@@ -51,20 +51,32 @@ URLs contain shell characters such as `#` and `&`, so always quote them.
 
 ## Output
 
-By default, only the full mix is exported. The file extension follows
-`--format`:
+By default, only the full mix is exported. In `mix` mode two flat files are
+written next to each other, named after `<songName>`; no directory is created.
+The audio extension follows `--format`, and the metadata file is
+`<songName>.json`:
 
 ```text
-My Song/
-  mix.wav
-  manifest.json
+My Song.wav
+My Song.json
 ```
 
 Use `-m/--mode` to choose the export mode:
 
-- `mix`: only the full mix (default)
-- `stems`: one file per channel
-- `all`: per-channel stems plus the full mix
+- `mix`: only the full mix, as flat files (default)
+- `stems`: one file per channel, inside a `<songName>/` directory
+- `all`: per-channel stems plus the full mix, inside a `<songName>/` directory
+
+Stem exports use a directory:
+
+```text
+My Song/
+  ch01.wav
+  ch02.wav
+  ...
+  mix.wav        # mode all only
+  manifest.json
+```
 
 For example, `-f mp3 -m all` produces `ch01.mp3`, `ch02.mp3`, ..., and
 `mix.mp3`.
@@ -78,7 +90,7 @@ For example, `-f mp3 -m all` produces `ch01.mp3`, `ch02.mp3`, ..., and
 --sample-rate <hz>      Sample rate. Default: 48000
 --loop <spec>           Loop controls: i=intro, o=outro, then repetitions. Default: io1
 --channel <list>        Comma-separated channel indexes to export, e.g. 0,2,3
---force                 Allow writing into an existing non-empty directory
+--force                 Allow overwriting output files or a non-empty directory
 --quiet                 Suppress progress output
 -h, --help              Show help
 -v, --version           Show the version

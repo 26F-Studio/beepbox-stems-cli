@@ -122,16 +122,34 @@ test("rejects an invalid --loop spec", async () => {
 	}
 });
 
-test("exports only the mix by default", async () => {
+test("exports only the mix by default as flat files", async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
-	const outputDir = join(tempDir, "Mix Only");
+	const outputBase = join(tempDir, "Mix Only");
 	try {
-		await runCli(["--quiet", outputDir, `#${SONG_HASH}`]);
-		const files = await readdir(outputDir);
-		assert.deepEqual(files.sort(), ["manifest.json", "mix.wav"]);
-		const manifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8"));
+		const { stdout } = await runCli(["--quiet", outputBase, `#${SONG_HASH}`]);
+		assert.equal(stdout.trim(), "Mix Only.wav");
+		const files = await readdir(tempDir);
+		assert.deepEqual(files.sort(), ["Mix Only.json", "Mix Only.wav"]);
+		const manifest = JSON.parse(await readFile(join(tempDir, "Mix Only.json"), "utf8"));
 		assert.deepEqual(manifest.stems, []);
-		assert.equal(manifest.mix, "mix.wav");
+		assert.equal(manifest.mix, "Mix Only.wav");
+	} finally {
+		await rm(tempDir, { recursive: true, force: true });
+	}
+});
+
+test("refuses to overwrite flat mix files without --force", async () => {
+	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
+	const outputBase = join(tempDir, "Flat Mix");
+	try {
+		await runCli(["--quiet", outputBase, `#${SONG_HASH}`]);
+		await assert.rejects(
+			() => runCli(["--quiet", outputBase, `#${SONG_HASH}`]),
+			(error) => /Output file already exists/.test(error.stderr),
+		);
+		await runCli(["--quiet", "--force", outputBase, `#${SONG_HASH}`]);
+		const files = await readdir(tempDir);
+		assert.deepEqual(files.sort(), ["Flat Mix.json", "Flat Mix.wav"]);
 	} finally {
 		await rm(tempDir, { recursive: true, force: true });
 	}
@@ -151,14 +169,14 @@ test("rejects an invalid --mode", async () => {
 
 test("exports MP3 with the requested quality", { skip: !ffmpegAvailable }, async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
-	const outputDir = join(tempDir, "MP3");
+	const outputBase = join(tempDir, "MP3");
 	try {
-		await runCli(["-m", "mix", "-f", "mp3", "-q", "2", "--quiet", outputDir, `#${SONG_HASH}`]);
-		const files = await readdir(outputDir);
-		assert.deepEqual(files.sort(), ["manifest.json", "mix.mp3"]);
-		const mp3 = await readFile(join(outputDir, "mix.mp3"));
+		await runCli(["-m", "mix", "-f", "mp3", "-q", "2", "--quiet", outputBase, `#${SONG_HASH}`]);
+		const files = await readdir(tempDir);
+		assert.deepEqual(files.sort(), ["MP3.json", "MP3.mp3"]);
+		const mp3 = await readFile(join(tempDir, "MP3.mp3"));
 		assert.equal(mp3.toString("ascii", 0, 3), "ID3");
-		const manifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8"));
+		const manifest = JSON.parse(await readFile(join(tempDir, "MP3.json"), "utf8"));
 		assert.equal(manifest.format.container, "mp3");
 		assert.equal(manifest.format.encoding, "libmp3lame");
 		assert.equal(manifest.format.quality, 2);
@@ -169,14 +187,14 @@ test("exports MP3 with the requested quality", { skip: !ffmpegAvailable }, async
 
 test("exports OGG with the default quality", { skip: !ffmpegAvailable }, async () => {
 	const tempDir = await mkdtemp(join(tmpdir(), "beepbox-export-test-"));
-	const outputDir = join(tempDir, "OGG");
+	const outputBase = join(tempDir, "OGG");
 	try {
-		await runCli(["-m", "mix", "-f", "ogg", "--quiet", outputDir, `#${SONG_HASH}`]);
-		const files = await readdir(outputDir);
-		assert.deepEqual(files.sort(), ["manifest.json", "mix.ogg"]);
-		const ogg = await readFile(join(outputDir, "mix.ogg"));
+		await runCli(["-m", "mix", "-f", "ogg", "--quiet", outputBase, `#${SONG_HASH}`]);
+		const files = await readdir(tempDir);
+		assert.deepEqual(files.sort(), ["OGG.json", "OGG.ogg"]);
+		const ogg = await readFile(join(tempDir, "OGG.ogg"));
 		assert.equal(ogg.toString("ascii", 0, 4), "OggS");
-		const manifest = JSON.parse(await readFile(join(outputDir, "manifest.json"), "utf8"));
+		const manifest = JSON.parse(await readFile(join(tempDir, "OGG.json"), "utf8"));
 		assert.equal(manifest.format.container, "ogg");
 		assert.equal(manifest.format.encoding, "libvorbis");
 		assert.equal(manifest.format.quality, 6);

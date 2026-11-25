@@ -1,5 +1,5 @@
-import { mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { access, mkdir, readdir, stat, unlink, writeFile } from "node:fs/promises";
+import { basename, dirname, join } from "node:path";
 import { Song } from "../vendor/beepbox/synth/synth.js";
 import { getEffectiveQuality, getEncoderName, getFileExtension, OutputFormat, writeRenderedAudio } from "./audio-encoder.js";
 import { renderSong, RenderedAudio, RenderSettings } from "./render.js";
@@ -16,13 +16,13 @@ export interface ExportOptions extends RenderSettings {
 }
 
 export interface ExportResult {
-	outputDir: string;
+	outputPath: string;
 	stemFiles: string[];
 	mixFile: string | null;
 	durationSeconds: number;
 }
 
-export async function exportProject(song: Song, outputDir: string, sourceLabel: string, options: ExportOptions): Promise<ExportResult> {
+export async function exportProject(song: Song, outputName: string, sourceLabel: string, options: ExportOptions): Promise<ExportResult> {
 	const allChannels: number[] = [];
 	for (let channelIndex: number = 0; channelIndex < song.getChannelCount(); channelIndex++) {
 		allChannels.push(channelIndex);
@@ -36,10 +36,22 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 		}
 	}
 
-	await prepareOutputDirectory(outputDir, options.force);
+	// Mix-only exports are flat files (`<name>.<ext>` and `<name>.json`).
+	// Any export with stems still needs a directory for the per-channel files.
+	const mixOnly: boolean = options.exportMix && !options.exportStems;
+	const extension: string = getFileExtension(options.format);
+	const outputBaseName: string = basename(outputName);
+	const mixFileName: string = mixOnly ? `${outputBaseName}.${extension}` : `mix.${extension}`;
+	const manifestFileName: string = mixOnly ? `${outputBaseName}.json` : "manifest.json";
+	const getOutputPath = (fileName: string): string => (mixOnly ? join(dirname(outputName), fileName) : join(outputName, fileName));
+
+	if (mixOnly) {
+		await prepareFlatOutput(outputName, [mixFileName, manifestFileName], options.force);
+	} else {
+		await prepareOutputDirectory(outputName, options.force);
+	}
 
 	const channelNumberWidth: number = Math.max(2, String(song.getChannelCount()).length);
-	const extension: string = getFileExtension(options.format);
 	const stemEntries: any[] = [];
 	const stemFiles: string[] = [];
 	let durationSeconds: number = 0;
@@ -54,7 +66,7 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 			}
 
 			const audio: RenderedAudio = renderSong(song, options, channelIndex);
-			await writeRenderedAudio(audio, join(outputDir, fileName), options.format, options.quality);
+			await writeRenderedAudio(audio, getOutputPath(fileName), options.format, options.quality);
 			durationSeconds = audio.durationSeconds;
 			stemFiles.push(fileName);
 			stemEntries.push({
@@ -73,8 +85,8 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 	if (options.exportMix) {
 		if (!options.quiet) console.log("Rendering full mix...");
 		const audio: RenderedAudio = renderSong(song, options, null);
-		mixFile = `mix.${extension}`;
-		await writeRenderedAudio(audio, join(outputDir, mixFile), options.format, options.quality);
+		mixFile = mixFileName;
+		await writeRenderedAudio(audio, getOutputPath(mixFileName), options.format, options.quality);
 		durationSeconds = audio.durationSeconds;
 	}
 
@@ -105,14 +117,37 @@ export async function exportProject(song: Song, outputDir: string, sourceLabel: 
 		mix: mixFile,
 		note: "Each stem is rendered independently through BeepBox's synth and output limiter. Summing the stems may not exactly reconstruct the full mix when the limiter is active.",
 	};
-	await writeFile(join(outputDir, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n", "utf8");
+	await writeFile(getOutputPath(manifestFileName), JSON.stringify(manifest, null, 2) + "\n", "utf8");
 
+	const outputPath: string = mixOnly ? getOutputPath(mixFileName) : outputName;
 	if (!options.quiet) {
 		const elapsedSeconds: number = (Date.now() - startedAt) / 1000;
-		console.log(`Done in ${elapsedSeconds.toFixed(2)}s: ${outputDir}`);
+		console.log(`Done in ${elapsedSeconds.toFixed(2)}s: ${outputPath}`);
 	}
 
-	return { outputDir, stemFiles, mixFile, durationSeconds };
+	return { outputPath, stemFiles, mixFile, durationSeconds };
+}
+
+async function prepareFlatOutput(outputBasePath: string, fileNames: string[], force: boolean): Promise<void> {
+	if (!force) {
+		for (const fileName of fileNames) {
+			const filePath: string = join(dirname(outputBasePath), fileName);
+			if (await pathExists(filePath)) {
+				throw new Error(`Output file already exists: ${filePath}. Use --force to overwrite it.`);
+			}
+		}
+	}
+	await mkdir(dirname(outputBasePath), { recursive: true });
+}
+
+async function pathExists(path: string): Promise<boolean> {
+	try {
+		await access(path);
+		return true;
+	} catch (error: any) {
+		if (error?.code == "ENOENT") return false;
+		throw error;
+	}
 }
 
 async function prepareOutputDirectory(outputDir: string, force: boolean): Promise<void> {
